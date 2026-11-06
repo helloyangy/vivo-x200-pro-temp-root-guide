@@ -1,0 +1,5 @@
+*.log
+*.pcap
+*.png
+*.apk
+.DS_Store
