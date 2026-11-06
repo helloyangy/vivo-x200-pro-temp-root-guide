@@ -247,7 +247,8 @@ App 自有运营位，由业务接口下发，hosts 去不掉。
 | `scripts/adblock_zqxy.sh` | 90+ 广告域名 hosts 拦截 |
 | `scripts/clear_ad_cache.sh` | 广告缓存备份清理 |
 
-GhostLock-X200 v1.3.5 作为 Release 资产分发（Apache-2.0，原样未修改）：
+GhostLock-X200 v1.3.5 上游仓库 [xiaohj233/ghostlock-x200-root](https://github.com/xiaohj233/ghostlock-x200-root)
+（Apache-2.0），本仓库的 Release 资产是它的逐字节备份（SHA256 与上游 release digest 一致）：
 
 ```powershell
 # 下载后校验
@@ -282,7 +283,7 @@ IP、账号或手机号。
 
 ## 十一、参考
 
-- GhostLock-X200 v1.3.5（Apache-2.0）：[Release 资产](https://github.com/helloyangy/vivo-x200-pro-temp-root-guide/releases/download/tools-v1.3.5/ghostlock-x200-root-v1.3.5.zip)
+- GhostLock-X200 v1.3.5（Apache-2.0）：[上游仓库](https://github.com/xiaohj233/ghostlock-x200-root) / [v1.3.5 Release](https://github.com/xiaohj233/ghostlock-x200-root/releases/tag/v1.3.5)
 - CVE-2026-43499 / IonStack：https://nebusec.ai/research/ionstack-part-2
 - KernelSU：https://kernelsu.org/
 - StevenBlock：https://github.com/Magisk-Modules-Alt-Repo/StevenBlock

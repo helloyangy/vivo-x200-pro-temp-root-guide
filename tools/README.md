@@ -4,7 +4,7 @@
 
 | 工具 | 版本 | 用途 | 许可证 | 获取 |
 | --- | --- | --- | --- | --- |
-| GhostLock-X200 | v1.3.5 | 临时 root 主链（CVE-2026-43499） | Apache-2.0 | [Release 资产](https://github.com/helloyangy/vivo-x200-pro-temp-root-guide/releases/download/tools-v1.3.5/ghostlock-x200-root-v1.3.5.zip) |
+| GhostLock-X200 | v1.3.5 | 临时 root 主链（CVE-2026-43499） | Apache-2.0 | [上游仓库](https://github.com/xiaohj233/ghostlock-x200-root) / [v1.3.5 Release](https://github.com/xiaohj233/ghostlock-x200-root/releases/tag/v1.3.5) |
 | KernelSU 管理器 | v3.2.5 (32525) | root 管理器（LKM / 越狱模式） | GPL-3.0 | [官方 release](https://github.com/tiann/KernelSU/releases)，本仓库不再分发 |
 | StevenBlock | v1.0 | systemless hosts 模块（重启后自动挂载广告规则） | 见上游仓库 | [Magisk-Modules-Alt-Repo/StevenBlock](https://github.com/Magisk-Modules-Alt-Repo/StevenBlock) |
 | adb (platform-tools) | 任意近期版本 | 设备连接 | — | [developer.android.com](https://developer.android.com/tools/releases/platform-tools) |
@@ -13,8 +13,11 @@
 
 ## GhostLock-X200 v1.3.5
 
-- SHA256：`0189A9ABBC461E3159C10B0FB6A09C07F415BAD1E5FF57991F7E381648231446`
-- 来源：第三方作者发布的 Apache-2.0 工具链快照，原样上传，未做修改
+- 上游：[xiaohj233/ghostlock-x200-root](https://github.com/xiaohj233/ghostlock-x200-root)（public，Apache-2.0）
+- 对应发布：[v1.3.5 Release](https://github.com/xiaohj233/ghostlock-x200-root/releases/tag/v1.3.5)，资产名 `ghostlock-x200-root-v1.3.5.zip`
+- 本仓库 Release 资产与上游发布**逐字节相同**（大小 6,738,802 字节，SHA256 与上游 release digest 一致）：
+  `0189A9ABBC461E3159C10B0FB6A09C07F415BAD1E5FF57991F7E381648231446`
+- 备份目的：上游仓库若被删除或改动，本仓库仍可复现教程；优先使用上游链接
 - 包内自带 `LICENSE`、`NOTICE`、`THIRD_PARTY_NOTICES.md`，分发时请一并保留
 - 注意：包内 `README.md` 的标题仍写 `v1.3.4`，目录名与发布名是 `v1.3.5`
 - 校验：
