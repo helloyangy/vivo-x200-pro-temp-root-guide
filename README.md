@@ -276,15 +276,28 @@ App 自有运营位，由业务接口下发，hosts 去不掉。
 
 上游工具自身的代码问题另见 [docs/upstream-issues.md](docs/upstream-issues.md)：
 v1.3.5 的 STAGE0 内核门禁在 `-Force` 路径下不生效（默认 `win_offs_b57.json`
-缺 `kernel_release` 字段），本地工作副本已打上修复，Release 资产保持上游原样。
+缺 `kernel_release` 字段），已修复并发布修复版资产。
 
-GhostLock-X200 v1.3.5 上游仓库 [xiaohj233/ghostlock-x200-root](https://github.com/xiaohj233/ghostlock-x200-root)
-（Apache-2.0），本仓库的 Release 资产是它的逐字节备份（SHA256 与上游 release digest 一致）：
+### GhostLock-X200 两个资产
+
+| 资产 | 说明 | SHA256 |
+| --- | --- | --- |
+| `ghostlock-x200-root-v1.3.5-stage0fix.zip` | **推荐**：上游 v1.3.5 + STAGE0 门禁修复（只改一个 JSON 字段） | `2A368F6FF8FAC57ECDCC34ED837273A3C20C9837E061AFDE46471220277E5BF7` |
+| `ghostlock-x200-root-v1.3.5.zip` | 上游原样，逐字节备份，未打补丁 | `0189A9ABBC461E3159C10B0FB6A09C07F415BAD1E5FF57991F7E381648231446` |
+
+上游仓库 [xiaohj233/ghostlock-x200-root](https://github.com/xiaohj233/ghostlock-x200-root)
+（Apache-2.0）。修复版与上游包逐条目比对：100 个条目，只有
+`tools/offset_tools/win_offs_b57.json` 不同（新增 1 行 `kernel_release`）。
 
 ```powershell
 # 下载后校验
-Get-FileHash .\ghostlock-x200-root-v1.3.5.zip -Algorithm SHA256
-# 期望 0189A9ABBC461E3159C10B0FB6A09C07F415BAD1E5FF57991F7E381648231446
+Get-FileHash .\ghostlock-x200-root-v1.3.5-stage0fix.zip -Algorithm SHA256
+```
+
+已经有原版包时，也可以直接打补丁（幂等，自带验证）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\patch_ghostlock.ps1 -ToolDir <解压后的 ghostlock-x200-root-main>
 ```
 
 本仓库不含任何真机数据：没有 pcap、日志、截图、UI dump，也没有设备序列号、

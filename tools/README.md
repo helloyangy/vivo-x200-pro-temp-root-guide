@@ -4,7 +4,7 @@
 
 | 工具 | 版本 | 用途 | 许可证 | 获取 |
 | --- | --- | --- | --- | --- |
-| GhostLock-X200 | v1.3.5 | 临时 root 主链（CVE-2026-43499） | Apache-2.0 | [上游仓库](https://github.com/xiaohj233/ghostlock-x200-root) / [v1.3.5 Release](https://github.com/xiaohj233/ghostlock-x200-root/releases/tag/v1.3.5) |
+| GhostLock-X200 | v1.3.5 + stage0fix | 临时 root 主链（CVE-2026-43499） | Apache-2.0 | [修复版 Release](https://github.com/helloyangy/vivo-x200-pro-temp-root-guide/releases/tag/v1.1.0) / [上游仓库](https://github.com/xiaohj233/ghostlock-x200-root) |
 | KernelSU 管理器 | v3.2.5 (32525) | root 管理器（LKM / 越狱模式） | GPL-3.0 | [官方 release](https://github.com/tiann/KernelSU/releases)，本仓库不再分发 |
 | StevenBlock | v1.0 | systemless hosts 模块（重启后自动挂载广告规则） | 见上游仓库 | [Magisk-Modules-Alt-Repo/StevenBlock](https://github.com/Magisk-Modules-Alt-Repo/StevenBlock) |
 | adb (platform-tools) | 任意近期版本 | 设备连接 | — | [developer.android.com](https://developer.android.com/tools/releases/platform-tools) |
@@ -15,15 +15,22 @@
 
 - 上游：[xiaohj233/ghostlock-x200-root](https://github.com/xiaohj233/ghostlock-x200-root)（public，Apache-2.0）
 - 对应发布：[v1.3.5 Release](https://github.com/xiaohj233/ghostlock-x200-root/releases/tag/v1.3.5)，资产名 `ghostlock-x200-root-v1.3.5.zip`
-- 本仓库 Release 资产与上游发布**逐字节相同**（大小 6,738,802 字节，SHA256 与上游 release digest 一致）：
-  `0189A9ABBC461E3159C10B0FB6A09C07F415BAD1E5FF57991F7E381648231446`
-- 备份目的：上游仓库若被删除或改动，本仓库仍可复现教程；优先使用上游链接
+- 本仓库提供两个资产：
+
+| 资产 | 说明 | SHA256 |
+| --- | --- | --- |
+| `ghostlock-x200-root-v1.3.5-stage0fix.zip` | 上游包 + STAGE0 门禁修复（新增 1 行 `kernel_release`），推荐使用 | `2A368F6FF8FAC57ECDCC34ED837273A3C20C9837E061AFDE46471220277E5BF7` |
+| `ghostlock-x200-root-v1.3.5.zip` | 上游原样备份，未打补丁 | `0189A9ABBC461E3159C10B0FB6A09C07F415BAD1E5FF57991F7E381648231446` |
+
+- 修复版与上游包逐条目比对：100 个条目，只有 `tools/offset_tools/win_offs_b57.json` 不同
+- 也可以手动打补丁：[scripts/patch_ghostlock.ps1](../scripts/patch_ghostlock.ps1)（幂等，自带 PASS/ABORT 验证）
+- 问题说明：[docs/upstream-issues.md](../docs/upstream-issues.md)
 - 包内自带 `LICENSE`、`NOTICE`、`THIRD_PARTY_NOTICES.md`，分发时请一并保留
 - 注意：包内 `README.md` 的标题仍写 `v1.3.4`，目录名与发布名是 `v1.3.5`
 - 校验：
 
 ```powershell
-Get-FileHash .\ghostlock-x200-root-v1.3.5.zip -Algorithm SHA256
+Get-FileHash .\ghostlock-x200-root-v1.3.5-stage0fix.zip -Algorithm SHA256
 ```
 
 ## KernelSU 管理器 APK

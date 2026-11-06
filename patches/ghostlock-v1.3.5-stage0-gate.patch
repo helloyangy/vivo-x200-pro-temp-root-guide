@@ -1,0 +1,8 @@
+--- a/tools/offset_tools/win_offs_b57.json
++++ b/tools/offset_tools/win_offs_b57.json
+@@ -1,4 +1,5 @@
+ {
++  "kernel_release": "6.6.89-android15-8-gb57af212129c-abogki457297774-4k",
+   "physmap_base": "0xffffff8000000000",
+   "sym_offs": {
+     "selinux_state": "0x2346ee8",

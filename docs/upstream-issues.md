@@ -73,11 +73,36 @@ foreach ($dev in @(
 
 预期：第一个 `PASS`，第二个 `ABORT`。
 
-### 本仓库处理
+### 验证记录
+
+用真实文件（不是模拟值）跑门禁表达式，结果：
+
+| `win_offs_b57.json` 来源 | 本机 b57 内核 | PD2405 的 6.6.30 构建 |
+| --- | --- | --- |
+| 上游原样（`gate_active=False`） | `abort=False`（跳过） | `abort=False`（跳过） |
+| 修复后（`gate_active=True`） | `abort=False`（放行） | `abort=True`（中止） |
+
+真机侧核对：`adb shell cat /proc/version` 返回
+`Linux version 6.6.89-android15-8-gb57af212129c-abogki457297774-4k ...`，
+与写入的 `kernel_release` 完全一致，修复不会影响本机流程。
+
+`root.ps1` 的 `-Force` 分支确认只有一条告警，不设置 `$GEN_WIN_OFFS`
+（全文件仅 L65 初始化与 L1403 精确命中处赋值），因此确实不会传 `-WinOffsPath`。
+
+### 本仓库处理（已修复并发布）
 
 - 本地工作副本 `ghostlock-x200-root-v1.3.5/ghostlock-x200-root-main/` 已打上这一行
-- Release 资产 `ghostlock-x200-root-v1.3.5.zip` **保持上游原样**（SHA256 未变），
-  下载后需要自己加这一行，或直接用本仓库打过补丁的本地副本
+- 新增可直接下载的修复版资产
+  `ghostlock-x200-root-v1.3.5-stage0fix.zip`
+  （SHA256 `2A368F6FF8FAC57ECDCC34ED837273A3C20C9837E061AFDE46471220277E5BF7`）
+  —— 与上游包逐条目比对：100 个条目，**只有 `tools/offset_tools/win_offs_b57.json` 不同**
+- 原始上游包 `ghostlock-x200-root-v1.3.5.zip` 继续保留，作为逐字节备份（SHA256 未变）
+- 补丁文件：[patches/ghostlock-v1.3.5-stage0-gate.patch](../patches/ghostlock-v1.3.5-stage0-gate.patch)
+- 一键打补丁脚本：[scripts/patch_ghostlock.ps1](../scripts/patch_ghostlock.ps1)（幂等，自带 PASS/ABORT 验证）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\patch_ghostlock.ps1 -ToolDir <解压后的 ghostlock-x200-root-main>
+```
 
 ---
 
