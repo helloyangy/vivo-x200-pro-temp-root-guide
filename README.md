@@ -154,28 +154,58 @@ KernelSU 管理器应显示：
 | 5 | `ksud soft-reboot` 后 su/管理器失效 | 软重启同样会让临时 root 会话失效，必须重跑 |
 | 6 | 管理器显示「未安装」 | 重装管理器 APK 可修复；`pm clear` 反而会破坏注册状态 |
 | 7 | LSPosed / Vector / Zygisk 模块不生效 | 临时 root 与 Zygisk 机制冲突，不可行 |
-| 8 | 重启后开屏广告回来了 | 检查 StevenBlock 模块 hosts，必要时重跑 `apply_adblock.sh` |
+| 8 | 重启后开屏广告回来了 | 检查 StevenBlock 模块 hosts，必要时重跑 `adblock_zqxy.sh` |
 
 ---
 
 ## 七、可选：趣智校园去广告
 
-本仓库附带 `scripts/adblock_zqxy.sh`，通过 hosts 拦截趣智校园的广告 SDK 域名。
+使用前提：root 已恢复。整条链路是「抓包定位域名 → 静态核对 → hosts 拦截 → 清缓存」。
 
-使用前提：root 已恢复。
+### 1. 抓包定位广告域名
+
+App 不一定走 VPN，直接抓真实网卡（移动流量通常是 `ccmni1`）：
+
+```powershell
+adb push scripts\capture_pcap.sh /data/local/tmp/capture_pcap.sh
+adb shell su -c "sh /data/local/tmp/capture_pcap.sh 30 /data/local/tmp/capture.pcap ccmni1"
+adb pull /data/local/tmp/capture.pcap
+```
+
+然后解析 DNS 查询与 TLS SNI：
+
+```powershell
+python scripts\pcap_parse.py capture.pcap
+```
+
+只抓到了 IP、没有域名时，说明流量走了 QUIC（UDP 443），需要按 IP 反查。
+
+### 2. 静态扫描 APK（辅助）
+
+```powershell
+python scripts\apk_scan.py app.apk
+```
+
+加固应用的 dex 是加密的，通常扫不到东西，以抓包结果为准。
+
+### 3. 写入拦截规则
 
 ```powershell
 adb push scripts\adblock_zqxy.sh /data/local/tmp/adblock_zqxy.sh
 adb shell su -c "sh /data/local/tmp/adblock_zqxy.sh"
 ```
 
-说明：
+脚本会幂等写入三个位置：
 
-- 仅拦截第三方广告 SDK 域名（TopOn、Pangle、GDT、Sigmob、YFAds、BeiZi、京东联盟等）
-- 不影响 App 核心功能
-- App 内自有运营位（横幅、返利频道）由 App 业务接口下发，hosts 无法去除
+| 位置 | 作用 |
+| --- | --- |
+| `/system/etc/hosts` | 立即生效，全局共享 |
+| `/data/adb/modules/stevenblock/system/etc/hosts` | 模块持久化，重启后自动挂载 |
+| `/data/adb/stevenblock/rules/block.list` | 模块规则列表 |
 
-配合清理广告缓存：
+注意 hosts 是**按域名精确匹配**，不覆盖子域，子域要逐条写。
+
+### 4. 清理广告素材缓存
 
 ```powershell
 adb push scripts\clear_ad_cache.sh /data/local/tmp/clear_ad_cache.sh
@@ -183,10 +213,54 @@ adb shell su -c "sh /data/local/tmp/clear_ad_cache.sh"
 ```
 
 缓存会先备份到 `/data/local/tmp/zqxy_adcache_backup`，需要时可手动恢复。
+只拦域名不清缓存，本地已缓存的广告仍会显示。
+
+### 5. 界面定位推广位
+
+```powershell
+adb shell uiautomator dump /sdcard/ui.xml
+adb pull /sdcard/ui.xml
+python scripts\ui_dump.py ui.xml adv
+```
+
+用 resource-id 判断内容来源：`task_adv_channel_*`、`item_activity_*` 这类是
+App 自有运营位，由业务接口下发，hosts 去不掉。
+
+已知限制：
+
+- 只能拦第三方广告 SDK（TopOn、Pangle、GDT、Sigmob、YFAds、BeiZi、京东联盟等）
+- App 内自有运营位（横幅、返利频道）无法通过 hosts 去除，原因见
+  [docs/troubleshooting.md 第 9 条](docs/troubleshooting.md)
 
 ---
 
-## 八、不要再做的事
+## 八、工具与脚本
+
+完整清单（版本、许可证、官方来源、SHA256）见 [tools/README.md](tools/README.md)。
+
+| 文件 | 说明 |
+| --- | --- |
+| `scripts/capture_pcap.sh` | 设备端抓包（DNS + TLS/QUIC） |
+| `scripts/pcap_parse.py` | 解析 pcap 中的域名 |
+| `scripts/apk_scan.py` | 静态扫描 APK 的广告 SDK 与域名 |
+| `scripts/ui_dump.py` | 解析 uiautomator dump，定位广告控件 |
+| `scripts/adblock_zqxy.sh` | 90+ 广告域名 hosts 拦截 |
+| `scripts/clear_ad_cache.sh` | 广告缓存备份清理 |
+
+GhostLock-X200 v1.3.5 作为 Release 资产分发（Apache-2.0，原样未修改）：
+
+```powershell
+# 下载后校验
+Get-FileHash .\ghostlock-x200-root-v1.3.5.zip -Algorithm SHA256
+# 期望 0189A9ABBC461E3159C10B0FB6A09C07F415BAD1E5FF57991F7E381648231446
+```
+
+本仓库不含任何真机数据：没有 pcap、日志、截图、UI dump，也没有设备序列号、
+IP、账号或手机号。
+
+---
+
+## 九、不要再做的事
 
 以下操作已在真机上验证会导致 root 失效，且无法通过简单操作恢复：
 
@@ -198,7 +272,7 @@ adb shell su -c "sh /data/local/tmp/clear_ad_cache.sh"
 
 ---
 
-## 九、免责声明
+## 十、免责声明
 
 本项目仅用于个人设备的安全研究与技术学习。临时 root 会降低设备安全性，
 使用前请自行评估风险。因操作导致的设备异常、数据丢失或账号问题，由使用者自行承担。
@@ -206,8 +280,10 @@ adb shell su -c "sh /data/local/tmp/clear_ad_cache.sh"
 
 ---
 
-## 十、参考
+## 十一、参考
 
-- GhostLock（CVE-2026-43499）：用户态提权 + KernelSU LKM
+- GhostLock-X200 v1.3.5（Apache-2.0）：[Release 资产](https://github.com/helloyangy/vivo-x200-pro-temp-root-guide/releases/download/tools-v1.3.5/ghostlock-x200-root-v1.3.5.zip)
+- CVE-2026-43499 / IonStack：https://nebusec.ai/research/ionstack-part-2
 - KernelSU：https://kernelsu.org/
+- StevenBlock：https://github.com/Magisk-Modules-Alt-Repo/StevenBlock
 - Zygisk Next：https://github.com/Dr-TSNG/ZygiskNext
