@@ -274,6 +274,10 @@ App 自有运营位，由业务接口下发，hosts 去不掉。
 | `scripts/adblock_zqxy.sh` | 90+ 广告域名 hosts 拦截 |
 | `scripts/clear_ad_cache.sh` | 广告缓存备份清理 |
 
+上游工具自身的代码问题另见 [docs/upstream-issues.md](docs/upstream-issues.md)：
+v1.3.5 的 STAGE0 内核门禁在 `-Force` 路径下不生效（默认 `win_offs_b57.json`
+缺 `kernel_release` 字段），本地工作副本已打上修复，Release 资产保持上游原样。
+
 GhostLock-X200 v1.3.5 上游仓库 [xiaohj233/ghostlock-x200-root](https://github.com/xiaohj233/ghostlock-x200-root)
 （Apache-2.0），本仓库的 Release 资产是它的逐字节备份（SHA256 与上游 release digest 一致）：
 
