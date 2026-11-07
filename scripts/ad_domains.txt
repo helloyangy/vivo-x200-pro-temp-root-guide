@@ -1,0 +1,227 @@
+# 全局开屏广告域名清单（第三方广告 SDK 专用域名）
+#
+# 适用：hosts 是全局的，这份清单对手机上所有 App 生效，不再限定某个 App。
+# 原则：只收录「广告 SDK / 广告投放平台专用域名」，绝不收录业务接口、账号、
+#       推送、支付、图片 CDN 等与正常功能共用的域名。
+#
+# 格式：一行一个域名，全小写，# 开头为注释，不要写通配符 / 端口 / 路径 / IP。
+# hosts 按域名精确匹配，不覆盖子域，所以子域要逐条列出。
+# 修改后先本地校验：python scripts/check_ad_domains.py
+# 再真机 dry-run：  adb shell su -c "sh /data/local/tmp/adblock_all.sh"
+#
+# 本清单是「保守集」：宁可漏拦，也不误拦。发现某个 App 还有开屏广告时，
+# 用 capture_pcap.sh + pcap_parse.py 抓出它的广告域名，追加到对应分组即可。
+
+# === 穿山甲 / Pangle / GroMore（字节） ===
+yfanads.com
+api.yfanads.com
+tracker.yfanads.com
+adx-data.yfanads.com
+pangolin-sdk-toutiao.com
+pangolin-sdk-toutiao-b.com
+api-access.pangolin-sdk-toutiao.com
+api-access.pangolin-sdk-toutiao1.com
+log-api.pangolin-sdk-toutiao.com
+gromore.pangolin-sdk-toutiao.com
+pglstatp-toutiao.com
+pglstatp-toutiao-b.com
+sf3-fe-tos.pglstatp-toutiao.com
+sf6-fe-tos.pglstatp-toutiao.com
+s3-fe-scm.pglstatp-toutiao.com
+pangolin.snssdk.com
+pangle.io
+api.pangle.io
+ad.pangle.io
+pangle.cn
+api.pangle.cn
+ad.pangle.cn
+gromore.com
+gromore.cn
+vcs.zijieapi.com
+
+# === 优量汇 / GDT（腾讯） ===
+gdt.qq.com
+ipv4.gdt.qq.com
+ad.gdt.qq.com
+sdk.gdt.qq.com
+sdkreport.gdt.qq.com
+mi.gdt.qq.com
+v.gdt.qq.com
+v2.gdt.qq.com
+v3.gdt.qq.com
+v2mi.gdt.qq.com
+v3mi.gdt.qq.com
+c.gdt.qq.com
+c2.gdt.qq.com
+c3.gdt.qq.com
+t.gdt.qq.com
+win.gdt.qq.com
+rpt.gdt.qq.com
+nc.gdt.qq.com
+sdk.e.qq.com
+sdkquic.e.qq.com
+union.eff.qq.com
+qzs.gdtimg.com
+gdtimg.qq.com
+gdtimg.com
+ugdtimg.com
+adsmind.ugdtimg.com
+pgdt.ugdtimg.com
+
+# === 快手联盟 ===
+open.e.kuaishou.com
+open.e.kuaishou.cn
+ad.e.kuaishou.com
+ad.kuaishou.com
+ads.kuaishou.com
+kwai-ad.com
+api.kuaishouzt.com
+api.kwaizt.com
+zt.gifshow.com
+w1.gskwai.com
+w2.gskwai.com
+w1.kskwai.com
+w2.kskwai.com
+ulog-sdk.gifshow.com
+ulog-sdk.ksapisrv.com
+
+# === 百度联盟 ===
+mobads.baidu.com
+mobads-logs.baidu.com
+union.baidu.com
+cpu-openapi.baidu.com
+cpro.baidu.com
+cpro2.baidu.com
+pos.baidu.com
+mobads-pre-config.cdn.bcebos.com
+mobads-pre-config.bj.bcebos.com
+
+# === Sigmob ===
+sigmob.cn
+sigmob.com
+dc.sigmob.cn
+adservice.sigmob.cn
+rtbcallback.sigmob.cn
+adxtool.sigmob.cn
+tbsasv.sigmob.cn
+ads.sigmob.cn
+api.sigmob.cn
+sdk.sigmob.cn
+log.sigmob.cn
+track.sigmob.cn
+ws.sigmob.cn
+rtb.sigmob.cn
+dg.sigmob.cn
+adx.sigmob.cn
+cdn.sigmob.cn
+img.sigmob.cn
+static.sigmob.cn
+ad.sigmob.com
+api.sigmob.com
+log.sigmob.com
+sdk.sigmob.com
+
+# === BeiZi 倍孜 ===
+beizi.biz
+sdk.beizi.biz
+ad.beizi.biz
+api.beizi.biz
+beizi.com
+ad.beizi.com
+api.beizi.com
+sdk.beizi.com
+
+# === TopOn / AnyThink ===
+anythinktech.com
+mores.anythinktech.com
+adx-bj.anythinktech.com
+onlineapi.anythinktech.com
+tk.anythinktech.com
+api.anythinktech.com
+conf.anythinktech.com
+toponad.com
+api.toponad.com
+log.toponad.com
+dsp-api-cn.metricslinks.com
+
+# === 其他国内广告平台 / 聚合 SDK ===
+s.1rtb.net
+sdk.1rtb.net
+cdn.1rtb.com
+ad.lovefree.cc
+ad.shunchangzhixing.com
+ad-api.adn-plus.com.cn
+sdktmp.hubcloud.com.cn
+sdk.tianmu.mobi
+vhs.wwstat.com
+c.etoolads.cn
+etoolads.cn
+s.tuia.cn
+tuia.cn
+ad.api2.jindaixx.com
+api.jindaixx.com
+jindaixx.com
+adxvip.com
+s.adxvip.com
+aggrx.com
+ad-api.4pyun.com
+ad-files.4pyun.com
+bj.ad.track.66mobi.com
+sdk-track.66mobi.com
+volc.bj.ad.track.66mobi.com
+adsdk.9imobi.com
+
+# === 手机厂商广告联盟 ===
+splash.ad.xiaomi.com
+ad.xiaomi.com
+sdkconfig.ad.xiaomi.com
+ads.oppomobile.com
+
+# === 360 商业广告 ===
+commercial.shouji.360.cn
+act.commercial.shouji.360.cn
+adapi.shouji.360.cn
+adapter.shouji.360.cn
+sdk.look.360.cn
+g.sdk.look.360.cn
+sdk.s.360.cn
+s.union.360.cn
+sdk.tf.360.cn
+sdkrec.tf.360.cn
+
+# === 国际广告平台（StevenBlack 主表已覆盖大部分，这里补常见遗漏） ===
+doubleclick.net
+2mdn.net
+2mdn-cn.net
+s1.2mdn.net
+googleadservices.com
+googlesyndication.com
+adservice.google.com
+admob.com
+applovin.com
+mintegral.com
+vungle.com
+
+# === 可选（默认不启用，风险自负） ===
+# 下面这些域名与业务接口或素材 CDN 共用，拦了可能影响正常功能，
+# 所以保持注释。确需启用时，先对单个 App 验证，再逐条打开。
+# ad.3.cn
+# cps.360buy.com
+# atom-log.3.cn
+# cui.m.1688.com
+# match.p4p.1688.com
+#
+# --- 小红书 9.50.0 冷启动实测（2026-11-07，见 docs/troubleshooting.md 第 9 条）---
+# 开屏广告是 App 自有的：配置由业务接口 edith.xiaohongshu.com 下发，
+# 素材走 xhscdn.com 的 CDN，抓包里没有任何第三方广告 SDK 域名。
+# ads-img-al.xhscdn.com 是唯一带 ads 的专用子域，可低风险试探，
+# 但它只管图片，配置仍在；拦了多半是「空白开屏」而不是「没有开屏」。
+# 想试就取消下一行的注释，再跑 check_ad_domains.py + adblock_all.sh --apply，
+# 不满意用 --rollback 撤销。
+# ads-img-al.xhscdn.com
+#
+# 绝对不要为了去开屏广告去拦下面这些（同一份抓包里出现的正常域名）：
+#   edith.xiaohongshu.com / fe.xiaohongshu.com / www.xiaohongshu.com  业务 API
+#   sns-avatar-qc.xhscdn.com / sns-na-i*.xhscdn.com                   笔记与头像图片
+#   b-gtc.getui.net / sdk-open-phone.getui.com                         个推推送通道
+#   nrt-stsdk.vivo.com.cn                                              vivo 系统 SDK

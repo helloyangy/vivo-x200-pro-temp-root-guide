@@ -1,5 +1,11 @@
 #!/system/bin/sh
-# 趣智校园 (com.klcxkj.zqxy) 第三方广告域名拦截
+# 趣智校园 (com.klcxkj.zqxy) 第三方广告域名拦截 —— 旧版回退脚本
+#
+# 保留不动，作为最小可用的回退路径：新方案出问题时可用它恢复最初的效果。
+# 日常请改用全局版：scripts/adblock_all.sh + scripts/ad_domains.txt
+# （hosts 是全局的，全局版只是把域名清单换成覆盖所有 App 的通用广告 SDK 清单，
+#   并额外提供 dry-run、备份、--rollback；两者写入位置相同，规则兼容。）
+#
 # 依赖：root（hosts 写入）+ StevenBlock 模块（可选）
 # 仅拦截广告 SDK 域名，不影响 App 业务功能
 

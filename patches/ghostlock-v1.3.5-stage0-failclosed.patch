@@ -1,0 +1,22 @@
+--- a/tools/scripts/root_full_permissive_restore.ps1
++++ b/tools/scripts/root_full_permissive_restore.ps1
+@@ -132,7 +132,18 @@
+ # (V2339A 6.1.145 跑 b57 偏移即此路径)。
+ $devVerRaw = (Shell "cat /proc/version 2>/dev/null").Trim()
+ $winRelease = [string]$win.kernel_release
+-if ($winRelease -and $devVerRaw -and $devVerRaw -notlike ("*" + $winRelease + "*")) {
++# ---- STAGE0 fail-closed 加固: 任一条件不可判定都视为失败, 绝不放行 ----
++if (-not $winRelease) {
++  Write-Output "STAGE0 GATE FAIL: win_offs 缺少 kernel_release, 无法判定偏移归属"
++  Write-Output "  (先运行 patch_ghostlock.ps1 补全规则源)"
++  exit 1
++}
++if (-not $devVerRaw) {
++  Write-Output "STAGE0 GATE FAIL: 无法读取设备 /proc/version, 拒绝在未知内核上写内存"
++  Write-Output "  (检查 adb 连接与 USB 调试; 上游门禁在此场景会静默跳过)"
++  exit 1
++}
++if ($devVerRaw -notlike ("*" + $winRelease + "*")) {
+   Write-Output "STAGE0 GATE FAIL: 设备内核与 win_offs 不匹配"
+   Write-Output "  device   : $devVerRaw"
+   Write-Output "  win_offs : $winRelease"

@@ -3,3 +3,4 @@
 *.png
 *.apk
 .DS_Store
+.workbuddy/

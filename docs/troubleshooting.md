@@ -235,34 +235,51 @@ Error: CONFIG_KSU_DEBUG is not enabled
 
 ## 8. 重启后广告拦截失效 / hosts 行为
 
-### 机制
+### 机制（真机实测，v1.0 模块与旧理解不同）
 
-本教程的去广告方案使用两层 hosts：
+StevenBlock v1.0 不是简单往 hosts 里追加几行，它是一个完整的 hosts 管理器：
 
 | 位置 | 说明 | 重启后 |
 | --- | --- | --- |
-| `/data/adb/modules/stevenblock/system/etc/hosts` | StevenBlock 模块 hosts | 自动挂载，持久 |
-| `/system/etc/hosts` | 直接写入的系统 hosts | 可能被还原 |
+| `/data/adb/stevenblock/rules/block.list` | **规则源**，自定义域名都在这里 | 保留，模块重建 hosts 时会重新编入 |
+| `/data/adb/modules/stevenblock/system/etc/hosts` | 模块编译出的 7.7 万行 hosts | 保留 |
+| `/system/etc/hosts` | 上述文件被 **bind mount** 到这个路径 | 依赖模块挂载 |
+
+实测 `/proc/mounts` 中 `/system/etc/hosts` 是 `/dev/block/dm-63` 的 f2fs 文件挂载，
+两个路径**指向同一个 inode**（`stat -Lc %d:%i` 可验证）。模块 hosts 文件头明确写着
+`Managed by StevenBlock. Manual edits are overwritten.`，所以只往 hosts 追加、
+不写 `block.list` 的规则，在模块重建或换列表后会丢失。
+
+临时 root 还要注意：冷启动后 KernelSU LKM 未加载，模块的 `post-mount.sh` /
+`service.sh` 不会自动跑，所以重跑 GhostLock 后需要确认 hosts 挂载是否恢复。
 
 ### 结论
 
-- 正常情况下，StevenBlock 模块会在开机时把广告规则挂载回去，无需重跑。
-- 如果开屏广告回来，先检查：
+- 全局规则以 `block.list` 为准，当前会话的即时生效靠写 bind mount 的 hosts：
+  见 `scripts/adblock_all.sh`（默认 dry-run，`--apply` 才写入，`--rollback` 还原）。
+- 如果开屏广告回来，按顺序检查：
 
 ```powershell
-adb shell su -c "grep -c yfanads /system/etc/hosts"
-adb shell su -c "grep -c yfanads /data/adb/modules/stevenblock/system/etc/hosts"
+adb shell su -c "grep -c ' /system/etc/hosts ' /proc/mounts"   # 是否还是 bind mount
+adb shell su -c "grep -c '^0.0.0.0 pangle.cn' /system/etc/hosts"
+adb shell su -c "grep -cx 'pangle.cn' /data/adb/stevenblock/rules/block.list"
+adb shell su -c "sh /data/local/tmp/adblock_all.sh"              # 预览，应显示待新增 0 条
 ```
 
-- 缺失时重跑：
+- 挂载在但规则缺失，重跑一次即可，**不要重启**：
 
 ```powershell
-adb shell su -c "sh /data/local/tmp/adblock_zqxy.sh"
+adb shell su -c "sh /data/local/tmp/adblock_all.sh --apply"
 ```
+
+- 若 `/system/etc/hosts` 不是 bind mount，脚本会主动中止，拒绝写真实系统分区；
+  此时先重跑 GhostLock 让模块重新挂载，或临时用 `--rules-only` 只更新规则源。
 
 ### 注意
 
 - hosts 是**按域名精确匹配**，不覆盖子域，必须逐个列子域。
+- Android 16 上 `ndc resolver` 的 DNS 缓存刷新不可用，改 hosts 后个别已运行的 App
+  可能仍用旧解析结果；开关一次飞行模式或重开 App 即可，无需重启。
 - 广告 SDK 会缓存素材。只拦域名不清缓存，本地缓存的广告仍会展示。
 - 缓存位置包括：
 
@@ -277,7 +294,7 @@ files/BeiZi
 files/sdm
 ```
 
-清理脚本见 `scripts/clear_ad_cache.sh`。
+清理脚本见 `scripts/clear_ad_cache.sh`（可指定包名，默认 dry-run，只移动不删除）。
 
 ---
 
@@ -300,6 +317,47 @@ hosts 按域名拦截，无法区分同一域名下的「广告接口」和「�
 
 这类内容只能通过 Xposed 类框架做界面级隐藏，
 而 Xposed/Zygisk 在本机临时 root 下不可行（见第 7 条）。
+
+### 推广到「全部 App 的自有开屏」
+
+同样的道理适用于微博、知乎、视频类 App 的自有开屏：素材常与登录、首页等业务接口
+共用同一个域名，hosts 无法区分「广告接口」和「业务接口」，拦掉整个域名 App 就不能用了。
+`scripts/ad_domains.txt` 因此只收录广告平台专用域名，绝不收录业务顶点域名。
+
+对这类开屏，可行且不伤手机的方案是**无障碍服务自动点「跳过」**
+（李跳跳 / 轻启动 / GKD 一类）：不需要 root、不改系统文件、不注入 zygote，
+与 GhostLock 临时 root 没有机制冲突。本仓库不分发这类 APK。
+
+不建议用 root 自己写「轮询 `uiautomator dump` 找『跳过』再 `input tap`」的守护脚本：
+
+- 需要高频调用 `su`，与第 11 条的建议冲突；
+- `uiautomator dump` 在 Android 16 上慢且不稳定，容易点到已经变化的界面；
+- 文本匹配不严谨时可能误点「立即打开」「授权」「支付」等按钮，风险不可控。
+
+### 实例：小红书 9.50.0（2026-11-07 真机抓包）
+
+用 `capture_pcap.sh 25 ... ccmni1 com.xingin.xhs` 抓冷启动，2,221 个包
+（IPv4 1,917 / IPv6 304），解析出 24 个 TLS SNI 域名、0 个可见 DNS 查询、
+1,001 个 UDP 443 包（其中 977 个去往同一个 IP，是 QUIC/HTTP3 长连接）。
+
+- **没有任何第三方广告 SDK 域名**（Pangle / GDT / Sigmob / TopOn 全都没出现）
+- 配置走业务接口：`edith.xiaohongshu.com`、`fe.xiaohongshu.com`、`as.xiaohongshu.com`
+- 素材走自有 CDN：`ads-img-al.xhscdn.com`、`sns-na-i*.xhscdn.com`、`sns-avatar-qc.xhscdn.com`
+- 同一份抓包里还有 `b-gtc.getui.net`、`sdk-open-phone.getui.com`（个推推送）和
+  `nrt-stsdk.vivo.com.cn`（vivo SDK）——**这些绝不能拦**，否则通知会挂
+- 本地还有开屏缓存：`files/splashAds`、`files/splashCptAdsConfig`、`files/ads_static_res`、
+  `app_ads_splash_btn_bg/ads_splash_btn_res.zip`
+
+所以这是典型的 App 自有开屏：配置与业务 API 共用域名，hosts 无法区分；
+素材 CDN 的兄弟子域还承担着笔记和头像图片，拦了会破坏正常浏览。
+即便只试探性地拦 `ads-img-al.xhscdn.com`（已作为**注释禁用**项记在清单末尾），
+最多让图片加载失败变成「空白开屏」，配置仍然下发，开屏倒计时也不会消失；
+而且主力流量走 QUIC 长连接，hosts 未必拦得到。清缓存同样无效——域名没被拦，
+素材下次冷启动会重新下载。
+
+结论：**hosts 管第三方 SDK 开屏，无障碍管自有开屏**，两者叠加才是「全部 App」的完整解，
+而 hosts 这部分在本机临时 root 下已经可以零重启、可回滚地完成。
+小红书这类 App 只能交给无障碍「跳过」工具，不要为了它去动业务域名。
 
 ---
 
@@ -358,8 +416,8 @@ adb shell /data/adb/ksud debug version
 
 # 6. 检查 KernelSU 管理器是否显示「工作中 <LKM>」
 
-# 7. 检查广告规则
-adb shell su -c "grep -c yfanads /system/etc/hosts"
+# 7. 检查广告规则（预览，应显示待新增 0 条；必要时 --apply）
+adb shell su -c "sh /data/local/tmp/adblock_all.sh"
 ```
 
 ---
@@ -373,6 +431,8 @@ adb shell su -c "grep -c yfanads /system/etc/hosts"
 | `su: inaccessible or not found` | 重启后正常现象，重跑 GhostLock |
 | 管理器显示「未安装」 | 重装管理器 APK |
 | 管理器点「安装」后异常 | 不要点，重跑 GhostLock |
-| 广告回来 | 检查 StevenBlock hosts，重跑 adblock 脚本 |
+| 广告回来 | 检查 hosts 挂载与 `block.list`，重跑 `adblock_all.sh --apply` |
+| 想撤销全局拦截 | `adblock_all.sh --rollback`（自动还原到最近一次备份） |
+| App 自带开屏仍在 | 属自有业务接口，hosts 去不掉，改用无障碍「跳过」类工具 |
 | 需要软重启 | 不要做，直接整机重启 + 重跑 |
 | 想装 LSPosed | 不要做，机制冲突 |
