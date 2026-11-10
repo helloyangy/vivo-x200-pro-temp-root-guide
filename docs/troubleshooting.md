@@ -206,30 +206,105 @@ Error: CONFIG_KSU_DEBUG is not enabled
 
 ---
 
-## 7. LSPosed / Vector / Zygisk 模块不生效
+## 7. Vector 管理器显示「未激活」/ Zygisk 模块不生效（重要，已解决）
 
 ### 现象
 
-安装了 Zygisk Next（`zygisksu` 1.5.2）、Vector 2.2 后，模块不加载；
-或者安装后重启，root 直接失效。
+Zygisk Next（`zygisksu` 1.5.2）与 Vector 2.2 都装好了，
+`zygiskd status` 也能连上服务、能识别 `zygisk_vector`，但：
 
-### 原因
+- Vector 管理器主页显示「未激活」
+- Vector 日志为空
+- 装了 Xposed 模块也不生效
 
-这是机制性冲突，不是配置问题：
+### 早期误判
 
-1. Zygisk 模块必须在 **zygote 启动时**注入。
-2. GhostLock 的 root 在 zygote 重启（软重启、整机重启）后失效。
-3. 重跑 GhostLock 后，zygote 已经启动完毕，Zygisk 不会再注入。
-4. 如果再重启 zygote 来加载 Zygisk，root 又会失效。
+最初把这条记成「机制性冲突、不可行」，这是错的。
+实际只要多执行一步 `setprop ctl.restart zygote` 就能解决，且不会掉 root。
 
-形成死循环。
+### 真实原因
 
-### 结论
+Zygisk 只能在 **zygote 刚被 exec 出来的那一瞬间**注入，这个窗口过期就没有第二次。
 
-在 GhostLock 临时 root 环境下，**不要尝试 LSPosed / Vector / 任何 Zygisk 模块**。
-包括 LocationSpoofer、虚拟定位、界面级去广告模块，全部不可行。
+本机实测时间线：
 
-需要这类模块，只能使用永久 root（解锁 Bootloader / 官方 KernelSU 刷入）。
+| 时刻 | 事件 |
+| --- | --- |
+| 13:46 | 设备重启 |
+| ~13:47 | zygote64 启动 |
+| 13:55 | root 脚本成功 |
+| 13:58 | `ksud services` 拉起 `zygiskd` / `vectord` |
+
+zygote 比 root 早 8 分钟以上。`zygiskd` 就绪时注入窗口早已关闭。
+
+判断方法（重启前）：
+
+```powershell
+adb shell "pidof zygote64"
+adb shell su -c "cat /proc/<上面的PID>/maps" | Select-String zygisk
+```
+
+命中 0 处 = 没有注入；此时管理器必然显示「未激活」。
+
+### 解决
+
+root 恢复后，再重启一次 zygote：
+
+```powershell
+adb shell su -c "setprop ctl.restart zygote"
+```
+
+约 30 秒后重新打开 Vector 管理器，状态变为「已激活」。
+
+### 实测验证
+
+```text
+执行前：zygote64 PID 1060，maps 3241 行，zygisk 命中 0
+执行后：zygote64 PID 21566，zygote 已重启
+        maps zygisk 命中 6 处：
+          /data/adb/modules/zygisksu/lib64/libzygisk.so
+          /data/adb/modules/zygisk_vector/zygisk/arm64-v8a.so
+        新增进程 zn-nsdaemon-zygote
+root：   uid=0 保持不变
+boot_id：a2ca9406-... 未变化（内核没有重启）
+Vector： 「未激活」→「已激活」
+```
+
+### 与 `ksud soft-reboot` 的区别
+
+| 操作 | 内核 | root | Zygisk |
+| --- | --- | --- | --- |
+| `setprop ctl.restart zygote` | 不重启（`boot_id` 不变） | 保留 | 可注入 |
+| `ksud soft-reboot` | 不重启 | **失效** | — |
+
+所以只有前者可用（见第 5 条）。
+
+### 每次开机都要重做
+
+zygote 永远比 root 先启动，所以每次冷启动后都要：
+
+```text
+root.ps1 -Force  →  setprop ctl.restart zygote
+```
+
+`root.ps1` 的 STAGE8 会自动跑 `ksud services`，`zygiskd` / `vectord` 不需要手动启动。
+
+### 查看 Vector 的两种方式
+
+命令行：
+
+```powershell
+adb shell su -c "/data/adb/modules/zygisk_vector/cli status"
+adb shell su -c "/data/adb/modules/zygisk_vector/cli modules ls"
+adb shell su -c "/data/adb/modules/zygisk_vector/cli scope"
+adb shell su -c "/data/adb/modules/zygisk_vector/cli log cat"
+```
+
+管理器 App（模块目录自带 APK）：
+
+```powershell
+adb shell su -c "pm install -r /data/adb/modules/zygisk_vector/manager.apk"
+```
 
 ---
 
@@ -315,8 +390,8 @@ hosts 按域名拦截，无法区分同一域名下的「广告接口」和「�
 
 ### 结论
 
-这类内容只能通过 Xposed 类框架做界面级隐藏，
-而 Xposed/Zygisk 在本机临时 root 下不可行（见第 7 条）。
+这类内容只能通过 Xposed 类框架做界面级隐藏。
+按第 7 条激活 Vector 后，可以用界面隐藏类模块处理。
 
 ### 推广到「全部 App 的自有开屏」
 
@@ -418,6 +493,9 @@ adb shell /data/adb/ksud debug version
 
 # 7. 检查广告规则（预览，应显示待新增 0 条；必要时 --apply）
 adb shell su -c "sh /data/local/tmp/adblock_all.sh"
+
+# 8. 需要 Zygisk / Vector 时，再重启一次框架
+adb shell su -c "setprop ctl.restart zygote"
 ```
 
 ---
@@ -435,4 +513,5 @@ adb shell su -c "sh /data/local/tmp/adblock_all.sh"
 | 想撤销全局拦截 | `adblock_all.sh --rollback`（自动还原到最近一次备份） |
 | App 自带开屏仍在 | 属自有业务接口，hosts 去不掉，改用无障碍「跳过」类工具 |
 | 需要软重启 | 不要做，直接整机重启 + 重跑 |
-| 想装 LSPosed | 不要做，机制冲突 |
+| 想装 LSPosed / Vector | 装完再执行 `setprop ctl.restart zygote` |
+| Vector 显示「未激活」 | root 后执行 `setprop ctl.restart zygote`，重启前 maps 里 zygisk 为 0 |

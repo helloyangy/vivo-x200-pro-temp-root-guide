@@ -152,6 +152,51 @@ KernelSU 管理器应显示：
 工作中 <LKM>
 ```
 
+### 5. 可选：启用 Zygisk / Vector
+
+需要 LSPosed / Vector / 任何 Zygisk 模块时，root 恢复后**必须再重启一次 zygote**：
+
+```powershell
+adb shell su -c "setprop ctl.restart zygote"
+```
+
+约 30 秒后，Vector 管理器从「未激活」变成「已激活」。
+
+原理：Zygisk 只能在 zygote 刚启动的那一瞬间被注入，而 zygote 总是比 root 先起来
+（本机实测早 8 分钟以上）。`root.ps1` 的 STAGE8 已经自动执行 `ksud services`，
+把 `zygiskd`、`vectord` 拉起来了，但 zygote 已经跑过，所以只差这一步重启。
+
+验证：
+
+```powershell
+adb shell "pidof zygote64"
+# 例如输出 21566
+
+adb shell su -c "cat /proc/21566/maps" | Select-String zygisk
+```
+
+本机实测：重启前 0 处命中，重启后 6 处，包含
+`/data/adb/modules/zygisksu/lib64/libzygisk.so` 与
+`/data/adb/modules/zygisk_vector/zygisk/arm64-v8a.so`。
+
+Vector 管理器安装（模块目录里自带 APK）：
+
+```powershell
+adb shell su -c "pm install -r /data/adb/modules/zygisk_vector/manager.apk"
+```
+
+查看框架状态（命令行）：
+
+```powershell
+adb shell su -c "/data/adb/modules/zygisk_vector/cli status"
+adb shell su -c "/data/adb/modules/zygisk_vector/cli modules ls"
+adb shell su -c "/data/adb/modules/zygisk_vector/cli log cat"
+```
+
+> 这一步只重启 Android 框架，**内核不重启**：实测 `boot_id` 不变，`su` 仍是 `uid=0`，
+> 不需要重跑提权脚本。屏幕会黑几秒到几十秒、所有 App 被关闭，属正常现象。
+> 它和 `ksud soft-reboot` 不是一回事，后者会破坏临时 root 会话（见踩坑 5）。
+
 ---
 
 ## 五、日常使用规则
@@ -163,6 +208,7 @@ KernelSU 管理器应显示：
 1. 开机后等待 1-2 分钟，让系统后台任务稳定
 2. 运行 `root.ps1 -Force`
 3. 看到 `ALL STAGES PASS` 后再使用需要 root 的功能
+4. 需要 Zygisk / Vector 时，再执行 `adb shell su -c "setprop ctl.restart zygote"`
 
 不要在开机后立刻运行，系统负载过高会导致脚本在 STAGE4 主动中止。
 
@@ -180,7 +226,7 @@ KernelSU 管理器应显示：
 | 4 | `svc power reboot userspace` 不支持 | vivo 系统禁用了 userspace reboot |
 | 5 | `ksud soft-reboot` 后 su/管理器失效 | 软重启同样会让临时 root 会话失效，必须重跑 |
 | 6 | 管理器显示「未安装」 | 重装管理器 APK 可修复；`pm clear` 反而会破坏注册状态 |
-| 7 | LSPosed / Vector / Zygisk 模块不生效 | 临时 root 与 Zygisk 机制冲突，不可行 |
+| 7 | Vector 管理器显示「未激活」 | root 后必须再执行一次 `setprop ctl.restart zygote`，见第四节第 5 步 |
 | 8 | 重启/重跑提权后开屏广告回来了 | 检查 `block.list` 与 hosts 挂载，必要时重跑 `adblock_all.sh --apply` |
 
 ---
@@ -328,6 +374,13 @@ python scripts\ui_dump.py ui.xml adv
 > 旧版 `scripts/adblock_zqxy.sh`（趣智校园专用、90+ 域名）**保留不动**，
 > 作为最小可用回退路径，不推荐使用。
 
+已知限制：
+
+- 只能拦第三方广告 SDK（TopOn、Pangle、GDT、Sigmob、YFAds、BeiZi、京东联盟等）
+- App 内自有运营位（横幅、返利频道）无法通过 hosts 去除，原因见
+  [docs/troubleshooting.md 第 9 条](docs/troubleshooting.md)；
+  激活 Vector 后可用界面隐藏类模块处理（见第四节第 5 步）
+
 ---
 
 ## 八、工具与脚本
@@ -390,11 +443,11 @@ IP、账号或手机号。
 
 ## 九、不要再做的事
 
-以下操作已在真机上验证会导致 root 失效，且无法通过简单操作恢复：
+以下做法已在真机上验证有问题或会让 root 失效，务必避开：
 
 1. **不要执行 `svc power reboot userspace`**：vivo 系统不支持。
 2. **不要执行 `ksud soft-reboot`**：会导致 `su`、`ksud` 失效，只能重跑 GhostLock。
-3. **不要在临时 root 上安装 LSPosed / Vector**：Zygisk 模块需要 zygote 启动时注入，而每次 zygote 重启都会打断 GhostLock 会话，形成死循环。
+3. **不要在装完 Zygisk / Vector 后跳过重启 zygote**：模块装了不等于生效。root 恢复后必须执行一次 `setprop ctl.restart zygote`，否则管理器一直显示「未激活」。这一步只重启框架，不会掉 root（已实测）。
 4. **不要点 KernelSU 管理器里的「卸载」或「安装」**：可能触发移除 root 或重装内核模块。
 5. **不要升级系统**：内核达到 `6.6.140` 后漏洞被修复。
 6. **不要为了让广告规则生效而重启**：hosts 改动当场生效，重启只会白白丢掉临时 root。
