@@ -165,7 +165,11 @@ GhostLock 的提权链在冷启动（包括软重启的 userspace 初始化）�
 ### 现象
 
 `su -c id` 返回 `uid=0(root)`，内核模块 `Live`，Zygisk/Vector 都正常，
-但管理器主页显示「未安装」，日志里刷 `SuperUserRepository: KsuService disconnected`。
+但管理器主页显示「未安装」。
+
+> 注意：日志里的 `SuperUserRepository: KsuService disconnected` **不能作为判据**。
+> 实测在 UI 已恢复正常「工作中 <LKM>」的状态下，这条告警仍然会出现，
+> 它只是管理器列超级用户列表时 root 服务的独立问题，与本条无关。
 
 ### 早期误判
 
@@ -175,15 +179,16 @@ GhostLock 的提权链在冷启动（包括软重启的 userspace 初始化）�
 
 ### 真实原因（2026-11-11 内核日志 + 源码定位）
 
-管理器判断「已越狱」依赖内核在它进程里放的一个 `anon_inode:[ksu_driver]` 文件句柄。
-内核只在应用进程 `setresuid` 时通过 syscall 钩子下发这个句柄，
-而钩子只对带 `TIF_SYSCALL_TRACEPOINT` 标记的进程生效（标记从 zygote 继承）。
+管理器判断「已越狱」依赖内核投递到它进程里的一个 `anon_inode:[ksu_driver]` 文件句柄。
+句柄由 KernelSU 的 syscall 钩子链路负责（内核在应用进程 `setresuid` 时安装，
+管理器启动时也会主动向内核申请一次），而这条链路只对带
+`TIF_SYSCALL_TRACEPOINT` 标记的进程生效——标记由 zygote 继承给所有子进程。
 
 **重启过 zygote 之后，新 zygote 不带标记**，链条整体断掉：
 
 ```text
 zygote 丢失内核标记
-  → 应用进程 setresuid 不再被内核钩子拦截
+  → 应用进程不再被内核 syscall 钩子覆盖（setresuid / 申请 fd 都不再被接管）
   → 管理器拿不到 [ksu_driver] 句柄
   → 无法查询内核版本 → UI 显示「未安装」
 ```
