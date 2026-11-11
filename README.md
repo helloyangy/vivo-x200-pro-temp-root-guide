@@ -162,6 +162,15 @@ adb shell su -c "setprop ctl.restart zygote"
 
 约 30 秒后，Vector 管理器从「未激活」变成「已激活」。
 
+> **重启 zygote 的副作用**：新 zygote 不带内核标记，KernelSU 管理器会显示「未安装」
+> （root 本身不受影响）。紧跟一条命令刷新标记即可恢复：
+>
+> ```powershell
+> adb shell su -c "/data/adb/ksud debug mark refresh"
+> ```
+>
+> 详见 [踩坑 6](docs/troubleshooting.md#6-kernelsu-管理器显示未安装根因已定位已解决)。
+
 原理：Zygisk 只能在 zygote 刚启动的那一瞬间被注入，而 zygote 总是比 root 先起来
 （本机实测早 8 分钟以上）。`root.ps1` 的 STAGE8 已经自动执行 `ksud services`，
 把 `zygiskd`、`vectord` 拉起来了，但 zygote 已经跑过，所以只差这一步重启。
@@ -208,7 +217,7 @@ adb shell su -c "/data/adb/modules/zygisk_vector/cli log cat"
 1. 开机后等待 1-2 分钟，让系统后台任务稳定
 2. 运行 `root.ps1 -Force`
 3. 看到 `ALL STAGES PASS` 后再使用需要 root 的功能
-4. 需要 Zygisk / Vector 时，再执行 `adb shell su -c "setprop ctl.restart zygote"`
+4. 需要 Zygisk / Vector 时，再执行 `adb shell su -c "setprop ctl.restart zygote"`，然后执行 `adb shell su -c "/data/adb/ksud debug mark refresh"`（否则管理器显示「未安装」）
 
 不要在开机后立刻运行，系统负载过高会导致脚本在 STAGE4 主动中止。
 
@@ -225,7 +234,7 @@ adb shell su -c "/data/adb/modules/zygisk_vector/cli log cat"
 | 3 | 重启后 `su` 消失 | 正常，重跑 GhostLock 即可 |
 | 4 | `svc power reboot userspace` 不支持 | vivo 系统禁用了 userspace reboot |
 | 5 | `ksud soft-reboot` 后 su/管理器失效 | 软重启同样会让临时 root 会话失效，必须重跑 |
-| 6 | 管理器显示「未安装」 | 重装管理器 APK 可修复；`pm clear` 反而会破坏注册状态 |
+| 6 | 管理器显示「未安装」 | 重启过 zygote 的正常副作用：`ksud debug mark refresh` 刷新标记即可，重装 APK 无效 |
 | 7 | Vector 管理器显示「未激活」 | root 后必须再执行一次 `setprop ctl.restart zygote`，见第四节第 5 步 |
 | 8 | 重启/重跑提权后开屏广告回来了 | 检查 `block.list` 与 hosts 挂载，必要时重跑 `adblock_all.sh --apply` |
 
@@ -447,10 +456,11 @@ IP、账号或手机号。
 
 1. **不要执行 `svc power reboot userspace`**：vivo 系统不支持。
 2. **不要执行 `ksud soft-reboot`**：会导致 `su`、`ksud` 失效，只能重跑 GhostLock。
-3. **不要在装完 Zygisk / Vector 后跳过重启 zygote**：模块装了不等于生效。root 恢复后必须执行一次 `setprop ctl.restart zygote`，否则管理器一直显示「未激活」。这一步只重启框架，不会掉 root（已实测）。
+3. **不要在装完 Zygisk / Vector 后跳过重启 zygote**：模块装了不等于生效。root 恢复后必须执行一次 `setprop ctl.restart zygote`，否则管理器一直显示「未激活」。这一步只重启框架，不会掉 root（已实测）。重启完记得补 `ksud debug mark refresh`（见上）。
 4. **不要点 KernelSU 管理器里的「卸载」或「安装」**：可能触发移除 root 或重装内核模块。
-5. **不要升级系统**：内核达到 `6.6.140` 后漏洞被修复。
-6. **不要为了让广告规则生效而重启**：hosts 改动当场生效，重启只会白白丢掉临时 root。
+5. **不要升级管理器 APK 到比内核新的版本**（如 v3.3.1/32680 配 32525 内核）：会常驻红条「需要更新内核」，误点升级有风险；普通 `adb install -r -d` 降级会被拒，需 root 下 `pm install -r -d`。保持与内核配套的 32525-2。
+6. **不要升级系统**：内核达到 `6.6.140` 后漏洞被修复。
+7. **不要为了让广告规则生效而重启**：hosts 改动当场生效，重启只会白白丢掉临时 root。
 
 ---
 

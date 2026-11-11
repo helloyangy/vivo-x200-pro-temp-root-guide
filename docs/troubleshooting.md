@@ -160,40 +160,99 @@ GhostLock 的提权链在冷启动（包括软重启的 userspace 初始化）�
 
 ---
 
-## 6. KernelSU 管理器显示「未安装」
+## 6. KernelSU 管理器显示「未安装」（根因已定位，已解决）
 
 ### 现象
 
-`su -c id` 返回 `uid=0(root)`，内核模块 `Live`，但管理器主页显示「未安装」。
+`su -c id` 返回 `uid=0(root)`，内核模块 `Live`，Zygisk/Vector 都正常，
+但管理器主页显示「未安装」，日志里刷 `SuperUserRepository: KsuService disconnected`。
 
-### 原因
+### 早期误判
 
-管理器的「管理器身份」是通过签名验证注册到内核模块的，不写在 `.allowlist` 里。
-以下操作会破坏这个注册状态：
+最早记成「管理器签名注册状态被破坏，重装管理器 APK 可修复」，
+这条是**错的**：2026-11-11 实测重装原版 32525-2、升级官方 32680 都无法恢复显示，
+管理器 APK 本身没有问题。
 
-- `pm clear me.weishu.kernelsu`（清除管理器数据）
-- 软重启
-- 某些情况下重跑提权链
+### 真实原因（2026-11-11 内核日志 + 源码定位）
 
-`.allowlist` 里只有被授权的普通 App（例如 `com.termux`、`com.zacharee1.systemuituner`），
-**管理器自己不在这个列表里**，这是正常的。
+管理器判断「已越狱」依赖内核在它进程里放的一个 `anon_inode:[ksu_driver]` 文件句柄。
+内核只在应用进程 `setresuid` 时通过 syscall 钩子下发这个句柄，
+而钩子只对带 `TIF_SYSCALL_TRACEPOINT` 标记的进程生效（标记从 zygote 继承）。
+
+**重启过 zygote 之后，新 zygote 不带标记**，链条整体断掉：
+
+```text
+zygote 丢失内核标记
+  → 应用进程 setresuid 不再被内核钩子拦截
+  → 管理器拿不到 [ksu_driver] 句柄
+  → 无法查询内核版本 → UI 显示「未安装」
+```
+
+注意 root 本身没有失效（`su` 一直可用），坏的只是管理器与内核的通信，
+所以这是**显示问题，不是提权问题**。
+
+### 触发条件
+
+一切让 zygote 重新 exec 的操作都会中招，包括：
+
+- 第 7 条为激活 Zygisk 执行的 `setprop ctl.restart zygote`
+- 装完 Vector 后的软重启
+- 某些「重启系统界面」类的 App / 工具
+
+冷启动后重跑 `root.ps1` 的场景一般**不会**中招
+（内核模块加载时的初始化扫描会正确标记当时的 zygote），
+中招的是「root 会话中途又动了一次 zygote」。
+
+### 诊断
+
+```powershell
+# 1. 拿 zygote PID
+adb shell "pidof zygote64"
+
+# 2. 查标记状态（root）
+adb shell su -c "/data/adb/ksud debug mark get <PID>"
+# 输出 unmarked = 中招；marked = 正常
+```
 
 ### 解决
 
-不要点管理器里的「卸载」或「安装」。用重装管理器 APK 的方式修复：
+刷新一遍进程标记即可，**不需要重启手机、不需要重跑 GhostLock**：
 
 ```powershell
-# 1. 提取原版 APK（root 可用时）
-adb exec-out su -c "cat $(adb shell pm path me.weishu.kernelsu | sed 's/package:/ /')" > kernelsu_manager.apk
-
-# 2. 卸载（只删管理器 App，不影响 /data/adb/ksu、模块和 root）
-adb shell pm uninstall me.weishu.kernelsu
-
-# 3. 重装
-adb install kernelsu_manager.apk
+adb shell su -c "/data/adb/ksud debug mark refresh"
 ```
 
-重装后打开管理器，通常会恢复显示「工作中 <LKM>」。
+然后强制停止并重开管理器：
+
+```powershell
+adb shell am force-stop me.weishu.kernelsu
+adb shell monkey -p me.weishu.kernelsu -c android.intent.category.LAUNCHER 1
+```
+
+实测输出 `Refreshed mark for all running processes`，zygote 变回 `marked`，
+重开管理器后恢复显示「工作中 <LKM>」。
+
+### 每次重启 zygote 后都要重做
+
+`mark refresh` 不会自动跟在 zygote 重启后面，所以第 7 条的注入流程完整版是：
+
+```text
+root.ps1 -Force  →  setprop ctl.restart zygote  →  ksud debug mark refresh
+```
+
+### 附带结论：管理器 APK 版本不要高于内核
+
+- 官方 v3.3.1（32680）管理器配 32525 内核能用，但会常驻红条
+  「需要更新内核」，误点升级有破坏临时 root 的风险。
+- 普通降级会被系统拒绝（`INSTALL_FAILED_VERSION_DOWNGRADE`），
+  root 下用 `pm install` 可以降：
+
+```powershell
+adb push kernelsu_manager_32525.apk /data/local/tmp/
+adb shell su -c "pm install -r -d /data/local/tmp/kernelsu_manager_32525.apk"
+```
+
+保持随 GhostLock 附带的、与内核版本号一致的 32525-2 即可。
 
 ### 不推荐
 
@@ -203,6 +262,8 @@ adb install kernelsu_manager.apk
 ```text
 Error: CONFIG_KSU_DEBUG is not enabled
 ```
+
+- 不要点管理器里的「卸载」「安装」「发现新版本升级」。
 
 ---
 
@@ -284,10 +345,12 @@ Vector： 「未激活」→「已激活」
 zygote 永远比 root 先启动，所以每次冷启动后都要：
 
 ```text
-root.ps1 -Force  →  setprop ctl.restart zygote
+root.ps1 -Force  →  setprop ctl.restart zygote  →  ksud debug mark refresh
 ```
 
 `root.ps1` 的 STAGE8 会自动跑 `ksud services`，`zygiskd` / `vectord` 不需要手动启动。
+最后一步 `mark refresh` 是因为重启 zygote 会让新 zygote 丢失内核标记，
+不刷新的话 KernelSU 管理器会显示「未安装」（见第 6 条）。
 
 ### 查看 Vector 的两种方式
 
@@ -496,6 +559,9 @@ adb shell su -c "sh /data/local/tmp/adblock_all.sh"
 
 # 8. 需要 Zygisk / Vector 时，再重启一次框架
 adb shell su -c "setprop ctl.restart zygote"
+
+# 9. 重启过 zygote 后刷新内核进程标记（否则管理器显示「未安装」，见第 6 条）
+adb shell su -c "/data/adb/ksud debug mark refresh"
 ```
 
 ---
@@ -507,11 +573,12 @@ adb shell su -c "setprop ctl.restart zygote"
 | 脚本退出在「机型未精确匹配」 | 加 `-Force` |
 | STAGE4 ABORT loadavg | 关后台 App，等 1-2 分钟，重跑 |
 | `su: inaccessible or not found` | 重启后正常现象，重跑 GhostLock |
-| 管理器显示「未安装」 | 重装管理器 APK |
+| 管理器显示「未安装」 | 重启过 zygote 的正常副作用，执行 `ksud debug mark refresh`，不要重装 APK |
+| 管理器红条「需要更新内核」 | 管理器版本高于内核（如 32680 配 32525），root 下 `pm install -r -d` 降回配套版本 |
 | 管理器点「安装」后异常 | 不要点，重跑 GhostLock |
 | 广告回来 | 检查 hosts 挂载与 `block.list`，重跑 `adblock_all.sh --apply` |
 | 想撤销全局拦截 | `adblock_all.sh --rollback`（自动还原到最近一次备份） |
 | App 自带开屏仍在 | 属自有业务接口，hosts 去不掉，改用无障碍「跳过」类工具 |
 | 需要软重启 | 不要做，直接整机重启 + 重跑 |
-| 想装 LSPosed / Vector | 装完再执行 `setprop ctl.restart zygote` |
+| 想装 LSPosed / Vector | 装完再执行 `setprop ctl.restart zygote` + `ksud debug mark refresh` |
 | Vector 显示「未激活」 | root 后执行 `setprop ctl.restart zygote`，重启前 maps 里 zygisk 为 0 |
