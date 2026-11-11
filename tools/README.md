@@ -43,15 +43,20 @@ Get-FileHash .\ghostlock-x200-root-v1.3.5-stage0fix-v2.zip -Algorithm SHA256
 ## KernelSU 管理器 APK
 
 本仓库**不分发 APK**，请从官方 release 下载 v3.2.5 (32525) 的 APK。
-
-踩坑 6 提到的「提取 / 卸载 / 重装管理器」流程，用的就是你手机上当前安装的那一份：
+需要备份手机上已装好的那一份时：
 
 ```powershell
 adb shell pm path me.weishu.kernelsu
 adb exec-out su -c "cat <上一步输出的路径去掉 package:>" > kernelsu_manager.apk
-adb shell pm uninstall me.weishu.kernelsu
-adb install kernelsu_manager.apk
 ```
+
+> **不要用「卸载再重装」去修管理器显示「未安装」**：踩坑 6 已确认该现象与 APK 无关，
+> 重装原版 32525-2、升级官方 32680 都无法恢复；而卸载会重新分配 uid，
+> 反而可能让内核里记录的管理器 uid 失效。正确做法是
+> `adb shell su -c "/data/adb/ksud debug mark refresh"` 后重开管理器。
+
+版本注意：管理器版本不要高于内核（本机为 32525）。普通 `adb install -r -d` 降级会被系统拒绝
+（`INSTALL_FAILED_VERSION_DOWNGRADE`），root 下 `pm install -r -d` 可以降。
 
 ## 隐私说明
 
